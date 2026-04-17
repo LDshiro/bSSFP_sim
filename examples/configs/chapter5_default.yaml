@@ -1,0 +1,41 @@
+meta:
+  case_name: "chapter5_default"
+  description: "default GUI case"
+
+physics:
+  T1_s: 1.5
+  T2_s: 1.0
+  M0: 1.0
+
+sequence:
+  TR_s: 0.004
+  rf_duration_s: 0.001
+  n_rf: 100
+  alpha_deg: 60.0
+  waveform_kind: "hann"
+  readout_fraction_of_free: 0.5
+
+phase_cycles:
+  values_deg:
+    - [0.0, 0.0]
+    - [0.0, 180.0]
+
+sweep:
+  delta_f_hz:
+    start: -200.0
+    stop: 200.0
+    count: 21
+
+integration:
+  rk_method: "RK45"
+  rk_rtol: 1.0e-7
+  rk_atol: 1.0e-9
+  rk_max_step_s: 5.0e-6
+  rk_superperiods: 60
+  save_every_time_step: true
+
+output:
+  save_profiles: true
+  save_rk_trajectories: true
+  save_steady_state_orbit: true
+  save_fixed_points: true

@@ -1,0 +1,35 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+
+# Packaging artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Test and quality tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pre-commit-cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Local runtime outputs
+data/generated/*
+!data/generated/.gitkeep
+
+# Editor and OS files
+.spyproject/
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+.DS_Store
