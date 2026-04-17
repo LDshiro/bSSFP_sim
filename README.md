@@ -26,6 +26,39 @@ playback, session presets, bookmarks, and screenshot export.
 - pyqtgraph
 - ruff / mypy / pytest / pre-commit
 
+## Repository Layout
+```text
+bSSFP/
+├─ src/bssfpviz/
+│  ├─ app/        # application entry point and startup
+│  ├─ core/       # Bloch / steady-state solvers and profile computation
+│  ├─ gui/        # Qt Widgets-based GUI components and controllers
+│  ├─ io/         # HDF5 and JSON persistence
+│  ├─ models/     # dataclasses and configuration/result models
+│  ├─ viz/        # visualization-facing helpers for 3D/2D views
+│  └─ workflows/  # high-level compute and GUI-triggered workflows
+├─ tests/
+│  ├─ unit/       # focused unit tests
+│  └─ integration/ # end-to-end and cross-module checks
+├─ examples/configs/  # runnable minimal YAML configs
+├─ data/generated/    # local generated outputs kept out of Git except .gitkeep
+├─ docs/chapters/     # chapter goals and progress notes
+├─ scripts/           # helper scripts for local experiments
+└─ pyproject.toml     # package and tool configuration
+```
+
+Directory responsibilities:
+- `src/bssfpviz/app/`: app entry point and bootstrapping
+- `src/bssfpviz/gui/`: Qt Widgets panels, windows, and GUI-side orchestration
+- `src/bssfpviz/viz/`: visualization logic shared by scene/plot layers
+- `src/bssfpviz/core/`: numerical core for Bloch integration, propagators, and steady state
+- `src/bssfpviz/io/`: persistence helpers for HDF5 and session/config serialization
+- `src/bssfpviz/models/`: typed configuration and result models
+- `src/bssfpviz/workflows/`: compute execution and higher-level operations invoked from CLI/GUI
+- `tests/`: unit and integration tests
+- `examples/configs/`: hand-editable example configs
+- `docs/chapters/`: chapter-by-chapter implementation notes
+
 ## Setup
 ```bash
 python -m venv .venv
