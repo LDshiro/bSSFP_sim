@@ -1,0 +1,68 @@
+comparison_scope: physics_only
+comparison_modes:
+  - matched_resolution
+
+common_physics:
+  T1_s: 1.5
+  T2_s: 1.0
+  M0: 1.0
+
+run_a:
+  sequence_family: BSSFP
+  label: compare_a
+  bssfp:
+    case_name: compare_a
+    description: reference bSSFP branch
+    sequence:
+      TR_s: 0.004
+      rf_duration_s: 0.001
+      n_rf: 16
+      alpha_deg: 45.0
+      waveform_kind: rect
+      readout_fraction_of_free: 0.5
+    phase_cycles:
+      values_deg:
+        - [0.0, 0.0]
+        - [0.0, 180.0]
+    sweep:
+      delta_f_hz:
+        start: -50.0
+        stop: 50.0
+        count: 3
+    integration:
+      rk_method: PROPAGATOR
+      rk_rtol: 1.0e-6
+      rk_atol: 1.0e-8
+      rk_max_step_s: 1.0e-4
+      rk_superperiods: 2
+      save_every_time_step: true
+
+run_b:
+  sequence_family: BSSFP
+  label: compare_b
+  bssfp:
+    case_name: compare_b
+    description: alternate bSSFP branch
+    sequence:
+      TR_s: 0.004
+      rf_duration_s: 0.001
+      n_rf: 16
+      alpha_deg: 60.0
+      waveform_kind: rect
+      readout_fraction_of_free: 0.5
+    phase_cycles:
+      values_deg:
+        - [0.0, 0.0]
+        - [0.0, 180.0]
+    sweep:
+      delta_f_hz:
+        start: -50.0
+        stop: 50.0
+        count: 3
+    integration:
+      rk_method: RK45
+      rk_rtol: 1.0e-6
+      rk_atol: 1.0e-8
+      rk_max_step_s: 1.0e-4
+      rk_superperiods: 2
+      save_every_time_step: true

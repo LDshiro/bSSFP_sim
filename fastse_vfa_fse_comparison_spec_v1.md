@@ -2029,3 +2029,26 @@ The following literature-to-spec relationships should be preserved in code comme
 
 - **future slice-profile-aware bridge between Bloch and EPG**  
   \(\rightarrow\) [G2021]
+
+### 21.1 Current repository mapping note
+
+The current repository implementation is now split into two layers:
+
+- legacy `bSSFP` GUI/viewer and legacy HDF5 compatibility path
+- generic comparison backend for future `BSSFP`, `FASTSE`, and `VFA_FSE` family dispatch
+
+Current code-level ownership is:
+
+- common low-level Bloch / affine numerics  
+  \(\rightarrow\) `src/bssfpviz/core/`
+- current bSSFP family-specific compilation and execution  
+  \(\rightarrow\) `src/bssfpviz/sequences/bssfp/`
+- generic experiment / result / comparison contracts  
+  \(\rightarrow\) `src/bssfpviz/models/comparison.py`
+- generic comparison HDF5 persistence  
+  \(\rightarrow\) `src/bssfpviz/io/comparison_hdf5.py`
+- generic comparison CLI / workflow  
+  \(\rightarrow\) `src/bssfpviz/workflows/compare.py`, `compare_cli.py`
+
+This mapping is intentionally preparatory. `FASTSE` and `VFA_FSE` sequence-family execution is not
+implemented yet in this phase.

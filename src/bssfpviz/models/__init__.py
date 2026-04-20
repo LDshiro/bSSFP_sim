@@ -1,5 +1,15 @@
 """Application data models and configuration helpers."""
 
+from bssfpviz.models.comparison import (
+    BSSFPFamilyConfig,
+    CommonPhysicsConfig,
+    ComparisonBundle,
+    CompiledSequence,
+    ExperimentConfig,
+    ExperimentRunConfig,
+    SequenceFamily,
+    SimulationResult,
+)
 from bssfpviz.models.config import (
     SCHEMA_VERSION,
     AppConfig,
@@ -33,6 +43,12 @@ from bssfpviz.models.run_config import (
 
 __all__ = [
     "AppConfig",
+    "BSSFPFamilyConfig",
+    "CommonPhysicsConfig",
+    "CompiledSequence",
+    "ComparisonBundle",
+    "ExperimentConfig",
+    "ExperimentRunConfig",
     "PhysicsConfig",
     "ProjectConfig",
     "SCHEMA_VERSION",
@@ -48,6 +64,8 @@ __all__ = [
     "RunIntegrationConfig",
     "RunPhysicsConfig",
     "RunSequenceConfig",
+    "SequenceFamily",
+    "SimulationResult",
     "SweepConfig",
     "load_app_config",
     "load_project_config",

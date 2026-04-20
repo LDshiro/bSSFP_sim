@@ -16,7 +16,7 @@ from bssfpviz.models.run_config import RunConfig
 from bssfpviz.workflows.compute_cli import main
 from bssfpviz.workflows.run_compute import run_compute
 
-run_compute_module = importlib.import_module("bssfpviz.workflows.run_compute")
+bssfp_runner_module = importlib.import_module("bssfpviz.sequences.bssfp.runner")
 
 
 def test_compute_cli_generates_hdf5_and_summary_json(tmp_path: Path) -> None:
@@ -103,8 +103,8 @@ def test_run_compute_uses_fast_reference_path(
     loop_count = config.sweep.count * config.n_acquisitions
     calls = {"affine": 0, "grid": 0}
 
-    real_affine = run_compute_module.integrate_reference_trajectory_with_affine_grid
-    real_grid = run_compute_module.integrate_reference_trajectory_with_grid
+    real_affine = bssfp_runner_module.integrate_reference_trajectory_with_affine_grid
+    real_grid = bssfp_runner_module.integrate_reference_trajectory_with_grid
 
     def counting_affine(*args: object, **kwargs: object) -> object:
         calls["affine"] += 1
@@ -115,12 +115,12 @@ def test_run_compute_uses_fast_reference_path(
         return real_grid(*args, **kwargs)
 
     monkeypatch.setattr(
-        run_compute_module,
+        bssfp_runner_module,
         "integrate_reference_trajectory_with_affine_grid",
         counting_affine,
     )
     monkeypatch.setattr(
-        run_compute_module,
+        bssfp_runner_module,
         "integrate_reference_trajectory_with_grid",
         counting_grid,
     )
@@ -144,8 +144,8 @@ def test_run_compute_uses_rk45_reference_path_when_requested(
     loop_count = config.sweep.count * config.n_acquisitions
     calls = {"affine": 0, "grid": 0}
 
-    real_affine = run_compute_module.integrate_reference_trajectory_with_affine_grid
-    real_grid = run_compute_module.integrate_reference_trajectory_with_grid
+    real_affine = bssfp_runner_module.integrate_reference_trajectory_with_affine_grid
+    real_grid = bssfp_runner_module.integrate_reference_trajectory_with_grid
 
     def counting_affine(*args: object, **kwargs: object) -> object:
         calls["affine"] += 1
@@ -156,12 +156,12 @@ def test_run_compute_uses_rk45_reference_path_when_requested(
         return real_grid(*args, **kwargs)
 
     monkeypatch.setattr(
-        run_compute_module,
+        bssfp_runner_module,
         "integrate_reference_trajectory_with_affine_grid",
         counting_affine,
     )
     monkeypatch.setattr(
-        run_compute_module,
+        bssfp_runner_module,
         "integrate_reference_trajectory_with_grid",
         counting_grid,
     )

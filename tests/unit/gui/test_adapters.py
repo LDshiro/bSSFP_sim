@@ -12,6 +12,8 @@ from bssfpviz.gui.adapters import (
     load_hdf5_dataset,
     load_run_config_from_yaml,
 )
+from bssfpviz.io.comparison_hdf5 import save_comparison_bundle
+from bssfpviz.models.comparison import ComparisonBundle, SequenceFamily, SimulationResult
 
 
 def test_load_run_config_adapter_reads_yaml() -> None:
@@ -71,6 +73,37 @@ def test_dataset_to_view_model_normalizes_alias_dataset(tmp_path: Path) -> None:
     assert vm.n_steady_frames == 5
     assert vm.get_vectors_xyz("reference", 0, 0).shape == (3, 3)
     assert vm.get_vectors_xyz("steady", 0, 0).shape == (3, 3)
+
+
+def test_load_hdf5_dataset_rejects_generic_comparison_schema(tmp_path: Path) -> None:
+    hdf5_path = tmp_path / "comparison_bundle.h5"
+    result = SimulationResult(
+        sequence_family=SequenceFamily.BSSFP,
+        run_label="run_a",
+        case_name="case_a",
+        axes={"delta_f_hz": np.array([-1.0, 0.0, 1.0], dtype=np.float64)},
+        trajectories={"rk_m": np.ones((3, 2, 2, 3), dtype=np.float64)},
+        observables={"sos_abs": np.ones((3,), dtype=np.float64)},
+        scalars={"n_delta_f": 3},
+    )
+    bundle = ComparisonBundle(
+        comparison_scope="physics_only",
+        comparison_modes=("matched_resolution",),
+        run_a=result,
+        run_b=SimulationResult(
+            sequence_family=SequenceFamily.BSSFP,
+            run_label="run_b",
+            case_name="case_b",
+            axes={"delta_f_hz": np.array([-1.0, 0.0, 1.0], dtype=np.float64)},
+            trajectories={"rk_m": np.ones((3, 2, 2, 3), dtype=np.float64)},
+            observables={"sos_abs": np.ones((3,), dtype=np.float64)},
+            scalars={"n_delta_f": 3},
+        ),
+    )
+    save_comparison_bundle(hdf5_path, bundle)
+
+    with np.testing.assert_raises_regex(ValueError, "legacy bSSFP viewer"):
+        load_hdf5_dataset(hdf5_path)
 
 
 def _write_gui_fixture_hdf5(path: Path) -> None:

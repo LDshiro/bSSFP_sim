@@ -163,6 +163,12 @@ def run_compute_adapter(config: Any, output_path: Path) -> Any:
 def load_hdf5_dataset(path: Path) -> Any:
     """Load an HDF5 file and return a GUI-friendly dataset view."""
     with h5py.File(path, "r") as handle:
+        if (
+            str(handle.attrs.get("schema_kind", "")) == "comparison_bundle"
+            or "comparison_schema_version" in handle.attrs
+        ):
+            msg = "Generic comparison HDF5 bundles are not supported by the legacy bSSFP viewer."
+            raise ValueError(msg)
         if _has_preferred_alias_datasets(handle):
             return _load_alias_dataset_view(handle, path)
 

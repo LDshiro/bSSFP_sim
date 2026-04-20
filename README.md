@@ -1,8 +1,12 @@
 # bloch-ssfp-visualizer
 
-`bloch-ssfp-visualizer` is a chapter-based local tool for studying Bloch / bSSFP behavior.
-Chapter 7 turns the GUI into a research-oriented comparison viewer with synchronized 3D/2D
-playback, session presets, bookmarks, and screenshot export.
+`bloch-ssfp-visualizer` is transitioning from a chapter-based bSSFP study tool into a broader
+MRI sequence comparison platform.
+
+The current repository now contains two layers:
+- a legacy **bSSFP viewer** GUI that remains compatible with the existing Chapter 7 workflow
+- a new **generic comparison backend** that can execute sequence-family experiments and write
+  comparison-oriented HDF5 bundles
 
 ## Chapter 7 Status
 - Qt GUI for loading/saving compute configs and running the Chapter 4 workflow
@@ -15,6 +19,12 @@ playback, session presets, bookmarks, and screenshot export.
 - session preset save/load as JSON
 - screenshot bundle export with PNG captures and session metadata
 - PyVista scene when 3D is available, textual fallback when it is not
+
+## Comparison Backend Status
+- `SequenceFamily`, `ExperimentConfig`, `SimulationResult`, and `ComparisonBundle` have been added
+- bSSFP is now available as a first-class family inside the generic comparison backend
+- `bssfpviz-compare` runs `BSSFP` vs `BSSFP` experiments and writes generic comparison HDF5 bundles
+- Fast SE and VFA-FSE are not implemented yet; the backend is prepared for those families next
 
 ## Tech Stack
 - Python 3.11+
@@ -107,6 +117,19 @@ Useful options:
 - `--overwrite`
 - `--quiet`
 - `--summary-json data/generated/ch4_default_summary.json`
+
+## Compare CLI
+```bash
+bssfpviz-compare --config examples/configs/comparison_bssfp_minimal.yaml --output data/generated/compare_bssfp.h5
+```
+
+This workflow currently supports:
+- `comparison_scope = physics_only`
+- `BSSFP` vs `BSSFP`
+- generic comparison HDF5 output under `/runs/a`, `/runs/b`, and `/comparison`
+
+The current GUI does not open these generic comparison bundles. It remains a legacy bSSFP viewer
+for the Chapter 7 dataset layout.
 
 ## Core Solver
 The compute CLI and the GUI-triggered background runner share a solver pipeline built around a
