@@ -42,7 +42,7 @@ def test_experiment_config_validate_supported_families_rejects_unimplemented_bra
 ) -> None:
     config_path = tmp_path / "unsupported_family.yaml"
     config_path.write_text(
-        _experiment_text().replace("sequence_family: BSSFP", "sequence_family: FASTSE", 1),
+        _experiment_text().replace("sequence_family: BSSFP", "sequence_family: VFA_FSE", 1),
         encoding="utf-8",
     )
 
@@ -50,6 +50,61 @@ def test_experiment_config_validate_supported_families_rejects_unimplemented_bra
 
     with pytest.raises(ValueError, match="Unsupported sequence families"):
         config.validate_supported_families({SequenceFamily.BSSFP})
+
+
+def test_experiment_config_from_yaml_loads_fastse_branches(tmp_path: Path) -> None:
+    config_path = tmp_path / "fastse_experiment.yaml"
+    config_path.write_text(_fastse_experiment_text(), encoding="utf-8")
+
+    config = ExperimentConfig.from_yaml(config_path)
+
+    assert config.comparison_scope == "physics_only"
+    assert config.run_a.sequence_family == SequenceFamily.FASTSE
+    assert config.run_b.sequence_family == SequenceFamily.FASTSE
+    assert config.run_a.fastse is not None
+    assert config.run_a.fastse.alpha_ref_const_deg == 180.0
+    assert config.run_b.fastse is not None
+    assert config.run_b.fastse.etl == 4
+
+
+def test_experiment_config_rejects_fastse_protocol_realistic_scope(tmp_path: Path) -> None:
+    config_path = tmp_path / "bad_fastse_scope.yaml"
+    config_path.write_text(
+        _fastse_experiment_text().replace(
+            "comparison_scope: physics_only",
+            "comparison_scope: protocol_realistic",
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="FASTSE baseline currently supports"):
+        ExperimentConfig.from_yaml(config_path)
+
+
+def test_experiment_config_rejects_fastse_unsupported_mode(tmp_path: Path) -> None:
+    config_path = tmp_path / "bad_fastse_mode.yaml"
+    config_path.write_text(
+        _fastse_experiment_text().replace("matched_resolution", "matched_scan_time"),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="FASTSE baseline does not support"):
+        ExperimentConfig.from_yaml(config_path)
+
+
+def test_experiment_config_rejects_fastse_invalid_timing_mode(tmp_path: Path) -> None:
+    config_path = tmp_path / "bad_fastse_timing.yaml"
+    config_path.write_text(
+        _fastse_experiment_text().replace(
+            "timing_mode: user_fixed_ESP",
+            "timing_mode: derive_min_ESP",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="timing_mode must be one of"):
+        ExperimentConfig.from_yaml(config_path)
 
 
 def _experiment_text() -> str:
@@ -108,5 +163,59 @@ def _experiment_text() -> str:
                 start: -10.0
                 stop: 10.0
                 count: 3
+        """
+    ).strip()
+
+
+def _fastse_experiment_text() -> str:
+    return dedent(
+        """
+        comparison_scope: physics_only
+        comparison_modes:
+          - matched_resolution
+          - matched_voxel
+
+        common_physics:
+          T1_s: 1000000000.0
+          T2_s: 1000000000.0
+          M0: 1.0
+
+        run_a:
+          sequence_family: FASTSE
+          label: fastse_a
+          fastse:
+            case_name: fastse_a
+            description: fastse left
+            alpha_exc_deg: 90.0
+            phi_exc_deg: 0.0
+            alpha_ref_const_deg: 180.0
+            phi_ref_deg: 90.0
+            etl: 4
+            esp_ms: 8.0
+            te_nominal_ms: 16.0
+            n_iso: 101
+            off_resonance_hz: 0.0
+            timing_mode: user_fixed_ESP
+            initial_state_mode: equilibrium
+            dephasing_model: effective_1d
+
+        run_b:
+          sequence_family: FASTSE
+          label: fastse_b
+          fastse:
+            case_name: fastse_b
+            description: fastse right
+            alpha_exc_deg: 90.0
+            phi_exc_deg: 0.0
+            alpha_ref_const_deg: 120.0
+            phi_ref_deg: 90.0
+            etl: 4
+            esp_ms: 8.0
+            te_nominal_ms: 16.0
+            n_iso: 101
+            off_resonance_hz: 0.0
+            timing_mode: user_fixed_ESP
+            initial_state_mode: equilibrium
+            dephasing_model: effective_1d
         """
     ).strip()

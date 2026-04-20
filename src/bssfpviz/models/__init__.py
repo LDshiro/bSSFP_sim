@@ -7,6 +7,7 @@ from bssfpviz.models.comparison import (
     CompiledSequence,
     ExperimentConfig,
     ExperimentRunConfig,
+    FastSEFamilyConfig,
     SequenceFamily,
     SimulationResult,
 )
@@ -49,6 +50,7 @@ __all__ = [
     "ComparisonBundle",
     "ExperimentConfig",
     "ExperimentRunConfig",
+    "FastSEFamilyConfig",
     "PhysicsConfig",
     "ProjectConfig",
     "SCHEMA_VERSION",

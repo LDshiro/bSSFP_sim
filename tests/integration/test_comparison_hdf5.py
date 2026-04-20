@@ -7,9 +7,14 @@ from pathlib import Path
 import numpy as np
 
 from bssfpviz.io.comparison_hdf5 import load_comparison_bundle, save_comparison_bundle
-from bssfpviz.models.comparison import ComparisonBundle
+from bssfpviz.models.comparison import (
+    CommonPhysicsConfig,
+    ComparisonBundle,
+    FastSEFamilyConfig,
+)
 from bssfpviz.models.run_config import RunConfig
 from bssfpviz.sequences.bssfp.runner import run_bssfp_simulation
+from bssfpviz.sequences.fastse.runner import run_fastse_simulation
 
 
 def test_comparison_bundle_round_trip_preserves_runs(tmp_path: Path) -> None:
@@ -40,6 +45,47 @@ def test_comparison_bundle_round_trip_preserves_runs(tmp_path: Path) -> None:
         run_a.observables["sos_abs"],
     )
     assert loaded.derived_ratios["sos_peak_ratio_b_over_a"] == 1.0
+
+
+def test_comparison_bundle_round_trip_preserves_fastse_runs(tmp_path: Path) -> None:
+    family_config = FastSEFamilyConfig(
+        case_name="fastse_case",
+        description="fastse comparison round-trip",
+        alpha_exc_deg=90.0,
+        phi_exc_deg=0.0,
+        alpha_ref_const_deg=120.0,
+        phi_ref_deg=90.0,
+        etl=4,
+        esp_ms=8.0,
+        te_nominal_ms=16.0,
+        n_iso=101,
+        off_resonance_hz=0.0,
+    )
+    physics = CommonPhysicsConfig(t1_s=1.0e9, t2_s=1.0e9, m0=1.0)
+    run_a = run_fastse_simulation(family_config, physics, run_label="run_a")
+    run_b = run_fastse_simulation(family_config, physics, run_label="run_b")
+    bundle = ComparisonBundle(
+        comparison_scope="physics_only",
+        comparison_modes=("matched_resolution",),
+        run_a=run_a,
+        run_b=run_b,
+        matched_constraints_summary={"delta_etl": 0},
+        derived_ratios={"echo_peak_ratio_b_over_a": 1.0},
+        report_metadata={"status": "ok"},
+    )
+    output_path = tmp_path / "fastse_comparison_bundle.h5"
+
+    save_comparison_bundle(output_path, bundle)
+    loaded = load_comparison_bundle(output_path)
+
+    assert loaded.run_a.sequence_family.value == "FASTSE"
+    assert loaded.run_b.run_label == "run_b"
+    np.testing.assert_allclose(loaded.run_a.axes["echo_time_s"], run_a.axes["echo_time_s"])
+    np.testing.assert_allclose(
+        loaded.run_a.observables["echo_signal_abs"],
+        run_a.observables["echo_signal_abs"],
+    )
+    assert loaded.derived_ratios["echo_peak_ratio_b_over_a"] == 1.0
 
 
 def _small_config_text() -> str:

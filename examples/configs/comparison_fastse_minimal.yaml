@@ -1,0 +1,46 @@
+comparison_scope: physics_only
+comparison_modes:
+  - matched_resolution
+
+common_physics:
+  T1_s: 1000000000.0
+  T2_s: 1000000000.0
+  M0: 1.0
+
+run_a:
+  sequence_family: FASTSE
+  label: fastse_a
+  fastse:
+    case_name: fastse_a
+    description: conventional 180-degree baseline
+    alpha_exc_deg: 90.0
+    phi_exc_deg: 0.0
+    alpha_ref_const_deg: 180.0
+    phi_ref_deg: 90.0
+    etl: 4
+    esp_ms: 8.0
+    te_nominal_ms: 16.0
+    n_iso: 101
+    off_resonance_hz: 0.0
+    timing_mode: user_fixed_ESP
+    initial_state_mode: equilibrium
+    dephasing_model: effective_1d
+
+run_b:
+  sequence_family: FASTSE
+  label: fastse_b
+  fastse:
+    case_name: fastse_b
+    description: 120-degree reference train
+    alpha_exc_deg: 90.0
+    phi_exc_deg: 0.0
+    alpha_ref_const_deg: 120.0
+    phi_ref_deg: 90.0
+    etl: 4
+    esp_ms: 8.0
+    te_nominal_ms: 16.0
+    n_iso: 101
+    off_resonance_hz: 0.0
+    timing_mode: user_fixed_ESP
+    initial_state_mode: equilibrium
+    dephasing_model: effective_1d

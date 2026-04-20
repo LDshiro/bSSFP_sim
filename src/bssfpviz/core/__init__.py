@@ -9,6 +9,7 @@ from bssfpviz.core.reference import (
     integrate_reference_trajectory_with_affine_grid,
     integrate_reference_trajectory_with_grid,
 )
+from bssfpviz.core.rf import hard_pulse_rotation, rotation_x, rotation_z
 
 __all__ = [
     "augmented_generator",
@@ -19,7 +20,10 @@ __all__ = [
     "integrate_reference_trajectory",
     "integrate_reference_trajectory_with_affine_grid",
     "integrate_reference_trajectory_with_grid",
+    "hard_pulse_rotation",
     "reconstruct_orbit",
+    "rotation_x",
+    "rotation_z",
     "segment_affine_propagator",
     "solve_fixed_point",
 ]

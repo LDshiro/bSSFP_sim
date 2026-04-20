@@ -38,6 +38,17 @@ SUPPORTED_COMPARISON_MODES = frozenset(
         "matched_coverage",
     }
 )
+SUPPORTED_FASTSE_COMPARISON_MODES = frozenset(
+    {
+        "matched_TE_contrast",
+        "matched_resolution",
+        "matched_voxel",
+    }
+)
+SUPPORTED_FASTSE_VARIANTS = frozenset({"FASTSE_CONST"})
+SUPPORTED_FASTSE_TIMING_MODES = frozenset({"user_fixed_ESP"})
+SUPPORTED_FASTSE_INITIAL_STATE_MODES = frozenset({"equilibrium"})
+SUPPORTED_FASTSE_DEPHASING_MODELS = frozenset({"effective_1d"})
 
 
 class SequenceFamily(StrEnum):
@@ -209,12 +220,99 @@ class BSSFPFamilyConfig:
 
 
 @dataclass(slots=True)
+class FastSEFamilyConfig:
+    """Family-specific settings for the initial idealized Fast SE implementation."""
+
+    case_name: str
+    description: str
+    alpha_exc_deg: float
+    phi_exc_deg: float
+    alpha_ref_const_deg: float
+    phi_ref_deg: float
+    etl: int
+    esp_ms: float
+    te_nominal_ms: float | None
+    n_iso: int
+    off_resonance_hz: float
+    sequence_variant: str = "FASTSE_CONST"
+    timing_mode: str = "user_fixed_ESP"
+    initial_state_mode: str = "equilibrium"
+    dephasing_model: str = "effective_1d"
+
+    def __post_init__(self) -> None:
+        if not self.case_name:
+            msg = "case_name must not be empty."
+            raise ValueError(msg)
+        if self.sequence_variant not in SUPPORTED_FASTSE_VARIANTS:
+            msg = f"sequence_variant must be one of {sorted(SUPPORTED_FASTSE_VARIANTS)}."
+            raise ValueError(msg)
+        if self.timing_mode not in SUPPORTED_FASTSE_TIMING_MODES:
+            msg = f"timing_mode must be one of {sorted(SUPPORTED_FASTSE_TIMING_MODES)}."
+            raise ValueError(msg)
+        if self.initial_state_mode not in SUPPORTED_FASTSE_INITIAL_STATE_MODES:
+            msg = (
+                "initial_state_mode must be one of "
+                f"{sorted(SUPPORTED_FASTSE_INITIAL_STATE_MODES)}."
+            )
+            raise ValueError(msg)
+        if self.dephasing_model not in SUPPORTED_FASTSE_DEPHASING_MODELS:
+            msg = (
+                "dephasing_model must be one of "
+                f"{sorted(SUPPORTED_FASTSE_DEPHASING_MODELS)}."
+            )
+            raise ValueError(msg)
+        if self.alpha_exc_deg <= 0.0 or self.alpha_ref_const_deg <= 0.0:
+            msg = "alpha_exc_deg and alpha_ref_const_deg must be positive."
+            raise ValueError(msg)
+        if self.etl <= 0:
+            msg = "etl must be positive."
+            raise ValueError(msg)
+        if self.esp_ms <= 0.0:
+            msg = "esp_ms must be positive."
+            raise ValueError(msg)
+        if self.te_nominal_ms is not None and self.te_nominal_ms <= 0.0:
+            msg = "te_nominal_ms must be positive when provided."
+            raise ValueError(msg)
+        if self.n_iso <= 0:
+            msg = "n_iso must be positive."
+            raise ValueError(msg)
+
+    @classmethod
+    def from_mapping(
+        cls,
+        mapping: dict[str, Any],
+        *,
+        default_case_name: str,
+    ) -> FastSEFamilyConfig:
+        return cls(
+            case_name=str(mapping.get("case_name", default_case_name)),
+            description=str(mapping.get("description", "")),
+            alpha_exc_deg=float(_require_key(mapping, "alpha_exc_deg")),
+            phi_exc_deg=float(mapping.get("phi_exc_deg", 0.0)),
+            alpha_ref_const_deg=float(_require_key(mapping, "alpha_ref_const_deg")),
+            phi_ref_deg=float(mapping.get("phi_ref_deg", 90.0)),
+            etl=int(_require_key(mapping, "etl")),
+            esp_ms=float(_require_key(mapping, "esp_ms")),
+            te_nominal_ms=(
+                None if mapping.get("te_nominal_ms") is None else float(mapping["te_nominal_ms"])
+            ),
+            n_iso=int(_require_key(mapping, "n_iso")),
+            off_resonance_hz=float(mapping.get("off_resonance_hz", 0.0)),
+            sequence_variant=str(mapping.get("sequence_variant", "FASTSE_CONST")),
+            timing_mode=str(mapping.get("timing_mode", "user_fixed_ESP")),
+            initial_state_mode=str(mapping.get("initial_state_mode", "equilibrium")),
+            dephasing_model=str(mapping.get("dephasing_model", "effective_1d")),
+        )
+
+
+@dataclass(slots=True)
 class ExperimentRunConfig:
     """One sequence-family branch inside a comparison experiment."""
 
     sequence_family: SequenceFamily
     label: str
     bssfp: BSSFPFamilyConfig | None = None
+    fastse: FastSEFamilyConfig | None = None
 
     def __post_init__(self) -> None:
         if not self.label:
@@ -223,8 +321,14 @@ class ExperimentRunConfig:
         if self.sequence_family == SequenceFamily.BSSFP and self.bssfp is None:
             msg = "bssfp configuration is required when sequence_family is BSSFP."
             raise ValueError(msg)
+        if self.sequence_family == SequenceFamily.FASTSE and self.fastse is None:
+            msg = "fastse configuration is required when sequence_family is FASTSE."
+            raise ValueError(msg)
         if self.sequence_family != SequenceFamily.BSSFP and self.bssfp is not None:
             msg = "bssfp settings may only be supplied for the BSSFP family."
+            raise ValueError(msg)
+        if self.sequence_family != SequenceFamily.FASTSE and self.fastse is not None:
+            msg = "fastse settings may only be supplied for the FASTSE family."
             raise ValueError(msg)
 
     @classmethod
@@ -237,12 +341,18 @@ class ExperimentRunConfig:
         family = SequenceFamily(str(_require_key(mapping, "sequence_family")).strip().upper())
         label = str(mapping.get("label", default_label))
         bssfp_mapping = _optional_mapping(mapping.get("bssfp")) if "bssfp" in mapping else {}
+        fastse_mapping = _optional_mapping(mapping.get("fastse")) if "fastse" in mapping else {}
         return cls(
             sequence_family=family,
             label=label,
             bssfp=(
                 BSSFPFamilyConfig.from_mapping(bssfp_mapping, default_case_name=label)
                 if family == SequenceFamily.BSSFP
+                else None
+            ),
+            fastse=(
+                FastSEFamilyConfig.from_mapping(fastse_mapping, default_case_name=label)
+                if family == SequenceFamily.FASTSE
                 else None
             ),
         )
@@ -402,6 +512,25 @@ class ExperimentConfig:
                 "Unsupported comparison_modes: "
                 + ", ".join(invalid_modes)
                 + f". Expected subset of {sorted(SUPPORTED_COMPARISON_MODES)}."
+            )
+            raise ValueError(msg)
+        self._validate_fastse_constraints()
+
+    def _validate_fastse_constraints(self) -> None:
+        runs = (self.run_a, self.run_b)
+        if not any(run.sequence_family == SequenceFamily.FASTSE for run in runs):
+            return
+        if self.comparison_scope != "physics_only":
+            msg = "FASTSE baseline currently supports comparison_scope='physics_only' only."
+            raise ValueError(msg)
+        invalid_modes = [
+            mode for mode in self.comparison_modes if mode not in SUPPORTED_FASTSE_COMPARISON_MODES
+        ]
+        if invalid_modes:
+            msg = (
+                "FASTSE baseline does not support comparison_modes: "
+                + ", ".join(invalid_modes)
+                + f". Expected subset of {sorted(SUPPORTED_FASTSE_COMPARISON_MODES)}."
             )
             raise ValueError(msg)
 
