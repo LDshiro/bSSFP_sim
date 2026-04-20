@@ -24,7 +24,7 @@ sweep:
     stop: 400.0
     count: 41
 integration:
-  rk_method: RK45
+  rk_method: PROPAGATOR
   rk_rtol: 4.999999999999996e-06
   rk_atol: 5.000000000000004e-08
   rk_max_step_s: 0.0001001

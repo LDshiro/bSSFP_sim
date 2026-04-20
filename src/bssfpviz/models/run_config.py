@@ -12,6 +12,23 @@ import yaml
 
 FloatArray = npt.NDArray[np.float64]
 SUPPORTED_WAVEFORM_KINDS = frozenset({"hann", "rect"})
+SUPPORTED_SOLVE_IVP_METHODS = frozenset({"RK23", "RK45", "DOP853", "Radau", "BDF", "LSODA"})
+SUPPORTED_REFERENCE_METHODS = frozenset({"PROPAGATOR", *SUPPORTED_SOLVE_IVP_METHODS})
+DEFAULT_REFERENCE_METHOD = "PROPAGATOR"
+
+
+def _canonical_reference_method(value: object) -> str:
+    normalized = str(value).strip()
+    aliases = {
+        "propagator": "PROPAGATOR",
+        "rk23": "RK23",
+        "rk45": "RK45",
+        "dop853": "DOP853",
+        "radau": "Radau",
+        "bdf": "BDF",
+        "lsoda": "LSODA",
+    }
+    return aliases.get(normalized.lower(), normalized)
 
 
 def _mapping(value: Any) -> dict[str, Any]:
@@ -160,9 +177,9 @@ class SweepConfig:
 
 @dataclass(slots=True)
 class IntegrationConfig:
-    """RK integration settings for the compute CLI."""
+    """Reference-trajectory integration settings for the compute CLI."""
 
-    rk_method: str = "RK45"
+    rk_method: str = DEFAULT_REFERENCE_METHOD
     rk_rtol: float = 1.0e-7
     rk_atol: float = 1.0e-9
     rk_max_step_s: float = 5.0e-6
@@ -170,8 +187,12 @@ class IntegrationConfig:
     save_every_time_step: bool = True
 
     def __post_init__(self) -> None:
+        self.rk_method = _canonical_reference_method(self.rk_method)
         if not self.rk_method:
             msg = "rk_method must not be empty."
+            raise ValueError(msg)
+        if self.rk_method not in SUPPORTED_REFERENCE_METHODS:
+            msg = f"rk_method must be one of {sorted(SUPPORTED_REFERENCE_METHODS)}."
             raise ValueError(msg)
         if self.rk_rtol <= 0.0 or self.rk_atol <= 0.0:
             msg = "rk_rtol and rk_atol must be positive."
@@ -251,7 +272,7 @@ class RunConfig:
                 count=int(_require_key(delta_f_values, "count")),
             ),
             integration=IntegrationConfig(
-                rk_method=str(integration_values.get("rk_method", "RK45")),
+                rk_method=str(integration_values.get("rk_method", DEFAULT_REFERENCE_METHOD)),
                 rk_rtol=float(integration_values.get("rk_rtol", 1.0e-7)),
                 rk_atol=float(integration_values.get("rk_atol", 1.0e-9)),
                 rk_max_step_s=float(integration_values.get("rk_max_step_s", 5.0e-6)),

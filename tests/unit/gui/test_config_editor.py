@@ -20,6 +20,7 @@ def test_config_editor_round_trips_default_config(qapp: object) -> None:
     assert round_trip.meta.case_name == config.meta.case_name
     assert round_trip.sequence.waveform_kind == config.sequence.waveform_kind
     assert round_trip.sequence.n_rf == config.sequence.n_rf
+    assert round_trip.integration.rk_method == config.integration.rk_method
     np.testing.assert_allclose(round_trip.phase_cycles.values_deg, config.phase_cycles.values_deg)
 
 

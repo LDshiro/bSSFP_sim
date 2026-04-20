@@ -7,7 +7,13 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from bssfpviz.models.run_config import PhaseCycleConfig, RunConfig, SequenceConfig, SweepConfig
+from bssfpviz.models.run_config import (
+    IntegrationConfig,
+    PhaseCycleConfig,
+    RunConfig,
+    SequenceConfig,
+    SweepConfig,
+)
 
 
 def test_run_config_from_yaml_loads_example_file() -> None:
@@ -16,6 +22,7 @@ def test_run_config_from_yaml_loads_example_file() -> None:
     assert config.meta.case_name == "chapter4_default"
     assert config.sequence.waveform_kind == "hann"
     assert config.phase_cycles.values_deg.shape == (2, 2)
+    assert config.integration.rk_method == "PROPAGATOR"
     assert config.integration.rk_superperiods == 60
 
 
@@ -76,3 +83,8 @@ def test_sequence_config_rejects_non_positive_free_interval() -> None:
 def test_sweep_config_rejects_non_positive_count() -> None:
     with pytest.raises(ValueError, match="count"):
         SweepConfig(start_hz=-1.0, stop_hz=1.0, count=0)
+
+
+def test_integration_config_rejects_invalid_reference_method() -> None:
+    with pytest.raises(ValueError, match="rk_method"):
+        IntegrationConfig(rk_method="EULER")

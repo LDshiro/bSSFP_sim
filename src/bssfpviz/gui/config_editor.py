@@ -211,7 +211,7 @@ class ConfigEditor(QWidget):
         content_layout.addWidget(self._build_sweep_group(content_widget))
 
         self.rk_method_combo = QComboBox(content_widget)
-        self.rk_method_combo.addItems(["RK45"])
+        self.rk_method_combo.addItems(["PROPAGATOR", "RK45"])
         self.rk_rtol_spin = self._make_double_spin(1.0e-12, 1.0, 12, 1.0e-7, content_widget)
         self.rk_atol_spin = self._make_double_spin(1.0e-12, 1.0, 12, 1.0e-9, content_widget)
         self.rk_max_step_spin = self._make_double_spin(1.0e-7, 1.0, 7, 1.0e-5, content_widget)

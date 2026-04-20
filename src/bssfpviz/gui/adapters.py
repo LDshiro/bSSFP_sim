@@ -86,7 +86,7 @@ def make_default_run_config() -> RunConfig:
         ),
         sweep=SweepConfig(start_hz=-200.0, stop_hz=200.0, count=21),
         integration=IntegrationConfig(
-            rk_method="RK45",
+            rk_method="PROPAGATOR",
             rk_rtol=1.0e-7,
             rk_atol=1.0e-9,
             rk_max_step_s=5.0e-6,

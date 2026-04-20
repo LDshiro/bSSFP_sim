@@ -20,6 +20,7 @@ def test_load_run_config_adapter_reads_yaml() -> None:
     assert config.meta.case_name == "chapter5_default"
     assert config.sequence.waveform_kind == "hann"
     assert config.phase_cycles.values_deg.shape == (2, 2)
+    assert config.integration.rk_method == "PROPAGATOR"
 
 
 def test_load_hdf5_dataset_adapter_returns_gui_view(tmp_path: Path) -> None:

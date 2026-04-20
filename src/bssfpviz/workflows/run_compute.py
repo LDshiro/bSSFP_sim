@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
+from typing import cast
 
 import h5py
 import numpy as np
@@ -14,8 +15,11 @@ import numpy.typing as npt
 from bssfpviz import __version__
 from bssfpviz.core.propagators import compose_affine_sequence, segment_affine_propagator
 from bssfpviz.core.reference import (
+    AffineReferenceGridSpec,
+    SolveIvpMethod,
     build_affine_reference_grid_spec,
     integrate_reference_trajectory_with_affine_grid,
+    integrate_reference_trajectory_with_grid,
 )
 from bssfpviz.core.segments import materialize_actual_waveforms
 from bssfpviz.core.steady_state import reconstruct_orbit, solve_fixed_point
@@ -172,14 +176,15 @@ def _compute_arrays(config: RunConfig) -> _ComputedArrays:
                 core_physics,
                 config,
             )
-            _, reference_m = integrate_reference_trajectory_with_affine_grid(
+            reference_m = _compute_reference_trajectory(
                 boundary_time_s=boundary_time_s,
                 segment_ux=segment_ux,
                 segment_uy=segment_uy,
                 delta_omega_rad_s=delta_omega_rad_s,
                 physics=core_physics,
-                grid_spec=reference_grid_spec,
-                initial_state=np.asarray([0.0, 0.0, config.physics.m0], dtype=np.float64),
+                config=config,
+                t_eval=rk_time_s,
+                reference_grid_spec=reference_grid_spec,
             )
             _, dense_orbit = integrate_reference_trajectory_with_affine_grid(
                 boundary_time_s=boundary_time_s,
@@ -324,6 +329,47 @@ def _build_repeated_boundary_indices(
             per_superperiod_indices[1:] + superperiod_index * per_superperiod_sample_count
         )
     return np.concatenate(repeated_indices)
+
+
+def _compute_reference_trajectory(
+    *,
+    boundary_time_s: FloatArray,
+    segment_ux: FloatArray,
+    segment_uy: FloatArray,
+    delta_omega_rad_s: float,
+    physics: CorePhysicsConfig,
+    config: RunConfig,
+    t_eval: FloatArray,
+    reference_grid_spec: AffineReferenceGridSpec,
+) -> FloatArray:
+    initial_state = np.asarray([0.0, 0.0, config.physics.m0], dtype=np.float64)
+    if config.integration.rk_method == "PROPAGATOR":
+        _, reference_m = integrate_reference_trajectory_with_affine_grid(
+            boundary_time_s=boundary_time_s,
+            segment_ux=segment_ux,
+            segment_uy=segment_uy,
+            delta_omega_rad_s=delta_omega_rad_s,
+            physics=physics,
+            grid_spec=reference_grid_spec,
+            initial_state=initial_state,
+        )
+        return reference_m
+
+    _, reference_m = integrate_reference_trajectory_with_grid(
+        boundary_time_s=boundary_time_s,
+        segment_ux=segment_ux,
+        segment_uy=segment_uy,
+        delta_omega_rad_s=delta_omega_rad_s,
+        total_duration_s=float(t_eval[-1]),
+        physics=physics,
+        t_eval=t_eval,
+        method=cast(SolveIvpMethod, config.integration.rk_method),
+        rtol=config.integration.rk_rtol,
+        atol=config.integration.rk_atol,
+        max_step_s=config.integration.rk_max_step_s,
+        initial_state=initial_state,
+    )
+    return reference_m
 
 
 def _compute_readout_profile(

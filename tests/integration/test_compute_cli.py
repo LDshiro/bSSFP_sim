@@ -2,18 +2,21 @@
 
 from __future__ import annotations
 
+import importlib
 import json
 from pathlib import Path
 from textwrap import dedent
 
 import h5py
+import numpy as np
 import pytest
 
-import bssfpviz.core.reference as reference_module
 from bssfpviz.io.hdf5_store import load_dataset
 from bssfpviz.models.run_config import RunConfig
 from bssfpviz.workflows.compute_cli import main
 from bssfpviz.workflows.run_compute import run_compute
+
+run_compute_module = importlib.import_module("bssfpviz.workflows.run_compute")
 
 
 def test_compute_cli_generates_hdf5_and_summary_json(tmp_path: Path) -> None:
@@ -95,22 +98,110 @@ def test_run_compute_uses_fast_reference_path(
 ) -> None:
     config_path = tmp_path / "small_compute.yaml"
     output_path = tmp_path / "small_compute.h5"
-    config_path.write_text(_small_config_text(), encoding="utf-8")
+    config_path.write_text(_small_config_text(rk_method="PROPAGATOR"), encoding="utf-8")
     config = RunConfig.from_yaml(config_path)
+    loop_count = config.sweep.count * config.n_acquisitions
+    calls = {"affine": 0, "grid": 0}
 
-    def fail_solve_ivp(*args: object, **kwargs: object) -> object:
-        raise AssertionError("run_compute should not call solve_ivp for Chapter 4 reference data")
+    real_affine = run_compute_module.integrate_reference_trajectory_with_affine_grid
+    real_grid = run_compute_module.integrate_reference_trajectory_with_grid
 
-    monkeypatch.setattr(reference_module, "solve_ivp", fail_solve_ivp)
+    def counting_affine(*args: object, **kwargs: object) -> object:
+        calls["affine"] += 1
+        return real_affine(*args, **kwargs)
+
+    def counting_grid(*args: object, **kwargs: object) -> object:
+        calls["grid"] += 1
+        return real_grid(*args, **kwargs)
+
+    monkeypatch.setattr(
+        run_compute_module,
+        "integrate_reference_trajectory_with_affine_grid",
+        counting_affine,
+    )
+    monkeypatch.setattr(
+        run_compute_module,
+        "integrate_reference_trajectory_with_grid",
+        counting_grid,
+    )
 
     summary = run_compute(config, output_path)
 
     assert summary.n_time_samples > 0
+    assert calls["grid"] == 0
+    assert calls["affine"] == 2 * loop_count
     with h5py.File(output_path, "r") as handle:
         assert handle["/rk/M"].shape[2] == summary.n_time_samples
 
 
-def _small_config_text() -> str:
+def test_run_compute_uses_rk45_reference_path_when_requested(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    config_path = tmp_path / "small_compute_rk45.yaml"
+    output_path = tmp_path / "small_compute_rk45.h5"
+    config_path.write_text(_small_config_text(rk_method="RK45"), encoding="utf-8")
+    config = RunConfig.from_yaml(config_path)
+    loop_count = config.sweep.count * config.n_acquisitions
+    calls = {"affine": 0, "grid": 0}
+
+    real_affine = run_compute_module.integrate_reference_trajectory_with_affine_grid
+    real_grid = run_compute_module.integrate_reference_trajectory_with_grid
+
+    def counting_affine(*args: object, **kwargs: object) -> object:
+        calls["affine"] += 1
+        return real_affine(*args, **kwargs)
+
+    def counting_grid(*args: object, **kwargs: object) -> object:
+        calls["grid"] += 1
+        return real_grid(*args, **kwargs)
+
+    monkeypatch.setattr(
+        run_compute_module,
+        "integrate_reference_trajectory_with_affine_grid",
+        counting_affine,
+    )
+    monkeypatch.setattr(
+        run_compute_module,
+        "integrate_reference_trajectory_with_grid",
+        counting_grid,
+    )
+
+    summary = run_compute(config, output_path)
+
+    assert summary.n_time_samples > 0
+    assert calls["grid"] == loop_count
+    assert calls["affine"] == loop_count
+    with h5py.File(output_path, "r") as handle:
+        assert handle["/rk/M"].shape[2] == summary.n_time_samples
+
+
+def test_run_compute_keeps_reference_grid_when_switching_methods(tmp_path: Path) -> None:
+    propagator_config_path = tmp_path / "small_compute_propagator.yaml"
+    rk45_config_path = tmp_path / "small_compute_rk45.yaml"
+    propagator_output_path = tmp_path / "small_compute_propagator.h5"
+    rk45_output_path = tmp_path / "small_compute_rk45.h5"
+
+    propagator_config_path.write_text(_small_config_text(rk_method="PROPAGATOR"), encoding="utf-8")
+    rk45_config_path.write_text(_small_config_text(rk_method="RK45"), encoding="utf-8")
+
+    propagator_config = RunConfig.from_yaml(propagator_config_path)
+    rk45_config = RunConfig.from_yaml(rk45_config_path)
+
+    run_compute(propagator_config, propagator_output_path)
+    run_compute(rk45_config, rk45_output_path)
+
+    with h5py.File(propagator_output_path, "r") as propagator_handle, h5py.File(
+        rk45_output_path, "r"
+    ) as rk45_handle:
+        np.testing.assert_allclose(propagator_handle["/rk/time_s"][:], rk45_handle["/rk/time_s"][:])
+        assert propagator_handle["/rk/M"].shape == rk45_handle["/rk/M"].shape
+        np.testing.assert_allclose(
+            propagator_handle["/steady_state/orbit_time_s"][:],
+            rk45_handle["/steady_state/orbit_time_s"][:],
+        )
+
+
+def _small_config_text(*, rk_method: str = "PROPAGATOR") -> str:
     return dedent(
         """
         meta:
@@ -142,7 +233,7 @@ def _small_config_text() -> str:
             count: 3
 
         integration:
-          rk_method: "RK45"
+          rk_method: "{rk_method}"
           rk_rtol: 1.0e-6
           rk_atol: 1.0e-8
           rk_max_step_s: 1.0e-4
@@ -155,4 +246,4 @@ def _small_config_text() -> str:
           save_steady_state_orbit: true
           save_fixed_points: true
         """
-    ).strip()
+    ).format(rk_method=rk_method).strip()
