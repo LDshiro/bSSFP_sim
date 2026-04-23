@@ -1,0 +1,56 @@
+comparison_scope: physics_only
+comparison_modes:
+  - matched_resolution
+  - matched_TE_contrast
+
+common_physics:
+  T1_s: 1.2
+  T2_s: 0.08
+  M0: 1.0
+
+run_a:
+  sequence_family: VFA_FSE
+  label: vfa_manual_a
+  vfa_fse:
+    case_name: vfa_manual_a
+    description: manual refocusing train with default CPMG phases
+    alpha_exc_deg: 90.0
+    phi_exc_deg: 0.0
+    alpha_ref_train_deg:
+      - 180.0
+      - 160.0
+      - 140.0
+      - 120.0
+    esp_ms: 8.0
+    te_nominal_ms: 16.0
+    n_iso: 101
+    off_resonance_hz: 0.0
+    timing_mode: user_fixed_ESP
+    initial_state_mode: equilibrium
+    dephasing_model: effective_1d
+
+run_b:
+  sequence_family: VFA_FSE
+  label: vfa_manual_b
+  vfa_fse:
+    case_name: vfa_manual_b
+    description: manual refocusing train with explicit phase schedule
+    alpha_exc_deg: 90.0
+    phi_exc_deg: 0.0
+    alpha_ref_train_deg:
+      - 150.0
+      - 130.0
+      - 110.0
+      - 90.0
+    phi_ref_train_deg:
+      - 90.0
+      - 100.0
+      - 110.0
+      - 120.0
+    esp_ms: 8.0
+    te_nominal_ms: 16.0
+    n_iso: 101
+    off_resonance_hz: 0.0
+    timing_mode: user_fixed_ESP
+    initial_state_mode: equilibrium
+    dephasing_model: effective_1d

@@ -68,6 +68,9 @@ def _format_summary(summary: ComparisonSummary) -> str:
         f"matched_constraint.{key}: {value}"
         for key, value in sorted(summary.matched_constraints_summary.items())
     ]
+    report_lines = [
+        f"report.{key}: {value}" for key, value in sorted(summary.report_metadata.items())
+    ]
     return "\n".join(
         [
             f"comparison_scope: {summary.comparison_scope}",
@@ -77,6 +80,7 @@ def _format_summary(summary: ComparisonSummary) -> str:
             f"run_a_case_name: {summary.run_a_case_name}",
             f"run_b_case_name: {summary.run_b_case_name}",
             f"elapsed_seconds: {summary.elapsed_seconds:.6f}",
+            *report_lines,
             *matched_lines,
             *derived_ratio_lines,
         ]

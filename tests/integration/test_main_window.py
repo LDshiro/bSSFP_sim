@@ -47,6 +47,10 @@ def test_main_window_has_menu_and_toolbar_actions(
         window.findChild(type(window.open_compare_dataset_action), "action-open-compare-dataset")
         is not None
     )
+    assert (
+        window.findChild(type(window.open_generic_preview_action), "action-open-generic-preview")
+        is not None
+    )
     assert window.findChild(QToolBar, "main-toolbar") is not None
 
     window.close()
@@ -100,6 +104,26 @@ def test_main_window_run_action_toggles_enabled_state(
     assert window.config_editor.run_button.isEnabled() is True
     assert output_path.exists()
 
+    window.close()
+
+
+def test_main_window_opens_generic_preview_window(
+    monkeypatch: pytest.MonkeyPatch, qapp: object
+) -> None:
+    _ = qapp
+    monkeypatch.setenv("BSSFPVIZ_DISABLE_3D", "1")
+    window = MainWindow()
+    window.show()
+    qapp.processEvents()
+
+    window.on_open_generic_preview()
+    qapp.processEvents()
+
+    assert window._generic_preview_window is not None
+    assert window._generic_preview_window.isVisible() is True
+    assert window._generic_preview_window.windowTitle() == "Generic Sequence Preview"
+
+    window._generic_preview_window.close()
     window.close()
 
 

@@ -45,10 +45,18 @@ SUPPORTED_FASTSE_COMPARISON_MODES = frozenset(
         "matched_voxel",
     }
 )
+SUPPORTED_VFA_FSE_COMPARISON_MODES = frozenset(
+    {
+        "matched_TE_contrast",
+        "matched_resolution",
+        "matched_voxel",
+    }
+)
 SUPPORTED_FASTSE_VARIANTS = frozenset({"FASTSE_CONST"})
 SUPPORTED_FASTSE_TIMING_MODES = frozenset({"user_fixed_ESP"})
 SUPPORTED_FASTSE_INITIAL_STATE_MODES = frozenset({"equilibrium"})
 SUPPORTED_FASTSE_DEPHASING_MODELS = frozenset({"effective_1d"})
+SUPPORTED_VFA_FSE_VARIANTS = frozenset({"VFA_FSE_MANUAL"})
 
 
 class SequenceFamily(StrEnum):
@@ -140,6 +148,14 @@ class CommonPhysicsConfig:
         """Return the legacy bSSFP CLI physics model."""
         return RunPhysicsConfig(t1_s=self.t1_s, t2_s=self.t2_s, m0=self.m0)
 
+    def to_mapping(self) -> dict[str, float]:
+        """Return a YAML-compatible mapping."""
+        return {
+            "T1_s": float(self.t1_s),
+            "T2_s": float(self.t2_s),
+            "M0": float(self.m0),
+        }
+
 
 @dataclass(slots=True)
 class BSSFPFamilyConfig:
@@ -217,6 +233,45 @@ class BSSFPFamilyConfig:
             integration=self.integration,
             output=self.output,
         )
+
+    def to_mapping(self) -> dict[str, Any]:
+        """Return a YAML-compatible BSSFP branch mapping."""
+        return {
+            "case_name": self.case_name,
+            "description": self.description,
+            "sequence": {
+                "TR_s": float(self.sequence.tr_s),
+                "rf_duration_s": float(self.sequence.rf_duration_s),
+                "n_rf": int(self.sequence.n_rf),
+                "alpha_deg": float(self.sequence.alpha_deg),
+                "waveform_kind": self.sequence.waveform_kind,
+                "readout_fraction_of_free": float(self.sequence.readout_fraction_of_free),
+            },
+            "phase_cycles": {
+                "values_deg": np.asarray(self.phase_cycles.values_deg, dtype=np.float64).tolist()
+            },
+            "sweep": {
+                "delta_f_hz": {
+                    "start": float(self.sweep.start_hz),
+                    "stop": float(self.sweep.stop_hz),
+                    "count": int(self.sweep.count),
+                }
+            },
+            "integration": {
+                "rk_method": self.integration.rk_method,
+                "rk_rtol": float(self.integration.rk_rtol),
+                "rk_atol": float(self.integration.rk_atol),
+                "rk_max_step_s": float(self.integration.rk_max_step_s),
+                "rk_superperiods": int(self.integration.rk_superperiods),
+                "save_every_time_step": bool(self.integration.save_every_time_step),
+            },
+            "output": {
+                "save_profiles": bool(self.output.save_profiles),
+                "save_rk_trajectories": bool(self.output.save_rk_trajectories),
+                "save_steady_state_orbit": bool(self.output.save_steady_state_orbit),
+                "save_fixed_points": bool(self.output.save_fixed_points),
+            },
+        }
 
 
 @dataclass(slots=True)
@@ -304,6 +359,150 @@ class FastSEFamilyConfig:
             dephasing_model=str(mapping.get("dephasing_model", "effective_1d")),
         )
 
+    def to_mapping(self) -> dict[str, Any]:
+        """Return a YAML-compatible FASTSE branch mapping."""
+        return {
+            "case_name": self.case_name,
+            "description": self.description,
+            "alpha_exc_deg": float(self.alpha_exc_deg),
+            "phi_exc_deg": float(self.phi_exc_deg),
+            "alpha_ref_const_deg": float(self.alpha_ref_const_deg),
+            "phi_ref_deg": float(self.phi_ref_deg),
+            "etl": int(self.etl),
+            "esp_ms": float(self.esp_ms),
+            "te_nominal_ms": None
+            if self.te_nominal_ms is None
+            else float(self.te_nominal_ms),
+            "n_iso": int(self.n_iso),
+            "off_resonance_hz": float(self.off_resonance_hz),
+            "sequence_variant": self.sequence_variant,
+            "timing_mode": self.timing_mode,
+            "initial_state_mode": self.initial_state_mode,
+            "dephasing_model": self.dephasing_model,
+        }
+
+
+@dataclass(slots=True)
+class VFAFSEFamilyConfig:
+    """Family-specific settings for manual VFA-FSE train import."""
+
+    case_name: str
+    description: str
+    alpha_exc_deg: float
+    phi_exc_deg: float
+    alpha_ref_train_deg: FloatArray
+    phi_ref_train_deg: FloatArray | None
+    esp_ms: float
+    te_nominal_ms: float | None
+    n_iso: int
+    off_resonance_hz: float
+    sequence_variant: str = "VFA_FSE_MANUAL"
+    timing_mode: str = "user_fixed_ESP"
+    initial_state_mode: str = "equilibrium"
+    dephasing_model: str = "effective_1d"
+
+    def __post_init__(self) -> None:
+        if not self.case_name:
+            msg = "case_name must not be empty."
+            raise ValueError(msg)
+        if self.sequence_variant not in SUPPORTED_VFA_FSE_VARIANTS:
+            msg = f"sequence_variant must be one of {sorted(SUPPORTED_VFA_FSE_VARIANTS)}."
+            raise ValueError(msg)
+        if self.timing_mode not in SUPPORTED_FASTSE_TIMING_MODES:
+            msg = f"timing_mode must be one of {sorted(SUPPORTED_FASTSE_TIMING_MODES)}."
+            raise ValueError(msg)
+        if self.initial_state_mode not in SUPPORTED_FASTSE_INITIAL_STATE_MODES:
+            msg = (
+                "initial_state_mode must be one of "
+                f"{sorted(SUPPORTED_FASTSE_INITIAL_STATE_MODES)}."
+            )
+            raise ValueError(msg)
+        if self.dephasing_model not in SUPPORTED_FASTSE_DEPHASING_MODELS:
+            msg = (
+                "dephasing_model must be one of "
+                f"{sorted(SUPPORTED_FASTSE_DEPHASING_MODELS)}."
+            )
+            raise ValueError(msg)
+        if self.alpha_exc_deg <= 0.0:
+            msg = "alpha_exc_deg must be positive."
+            raise ValueError(msg)
+        self.alpha_ref_train_deg = _as_axis_array(self.alpha_ref_train_deg, "alpha_ref_train_deg")
+        if np.any(self.alpha_ref_train_deg <= 0.0):
+            msg = "alpha_ref_train_deg must contain positive values only."
+            raise ValueError(msg)
+        if self.phi_ref_train_deg is None:
+            self.phi_ref_train_deg = np.full(self.alpha_ref_train_deg.shape, 90.0, dtype=np.float64)
+        else:
+            self.phi_ref_train_deg = _as_axis_array(self.phi_ref_train_deg, "phi_ref_train_deg")
+        if self.alpha_ref_train_deg.shape != self.phi_ref_train_deg.shape:
+            msg = "alpha_ref_train_deg and phi_ref_train_deg must have the same shape."
+            raise ValueError(msg)
+        if self.esp_ms <= 0.0:
+            msg = "esp_ms must be positive."
+            raise ValueError(msg)
+        if self.te_nominal_ms is not None and self.te_nominal_ms <= 0.0:
+            msg = "te_nominal_ms must be positive when provided."
+            raise ValueError(msg)
+        if self.n_iso <= 0:
+            msg = "n_iso must be positive."
+            raise ValueError(msg)
+
+    @property
+    def etl(self) -> int:
+        """Return the echo-train length implied by the imported flip train."""
+        return int(self.alpha_ref_train_deg.shape[0])
+
+    @classmethod
+    def from_mapping(
+        cls,
+        mapping: dict[str, Any],
+        *,
+        default_case_name: str,
+    ) -> VFAFSEFamilyConfig:
+        raw_phi_ref_train = mapping.get("phi_ref_train_deg")
+        return cls(
+            case_name=str(mapping.get("case_name", default_case_name)),
+            description=str(mapping.get("description", "")),
+            alpha_exc_deg=float(_require_key(mapping, "alpha_exc_deg")),
+            phi_exc_deg=float(mapping.get("phi_exc_deg", 0.0)),
+            alpha_ref_train_deg=_require_key(mapping, "alpha_ref_train_deg"),
+            phi_ref_train_deg=raw_phi_ref_train,
+            esp_ms=float(_require_key(mapping, "esp_ms")),
+            te_nominal_ms=(
+                None if mapping.get("te_nominal_ms") is None else float(mapping["te_nominal_ms"])
+            ),
+            n_iso=int(_require_key(mapping, "n_iso")),
+            off_resonance_hz=float(mapping.get("off_resonance_hz", 0.0)),
+            sequence_variant=str(mapping.get("sequence_variant", "VFA_FSE_MANUAL")),
+            timing_mode=str(mapping.get("timing_mode", "user_fixed_ESP")),
+            initial_state_mode=str(mapping.get("initial_state_mode", "equilibrium")),
+            dephasing_model=str(mapping.get("dephasing_model", "effective_1d")),
+        )
+
+    def to_mapping(self) -> dict[str, Any]:
+        """Return a YAML-compatible VFA-FSE branch mapping."""
+        assert self.phi_ref_train_deg is not None
+        return {
+            "case_name": self.case_name,
+            "description": self.description,
+            "alpha_exc_deg": float(self.alpha_exc_deg),
+            "phi_exc_deg": float(self.phi_exc_deg),
+            "alpha_ref_train_deg": np.asarray(
+                self.alpha_ref_train_deg, dtype=np.float64
+            ).tolist(),
+            "phi_ref_train_deg": np.asarray(self.phi_ref_train_deg, dtype=np.float64).tolist(),
+            "esp_ms": float(self.esp_ms),
+            "te_nominal_ms": None
+            if self.te_nominal_ms is None
+            else float(self.te_nominal_ms),
+            "n_iso": int(self.n_iso),
+            "off_resonance_hz": float(self.off_resonance_hz),
+            "sequence_variant": self.sequence_variant,
+            "timing_mode": self.timing_mode,
+            "initial_state_mode": self.initial_state_mode,
+            "dephasing_model": self.dephasing_model,
+        }
+
 
 @dataclass(slots=True)
 class ExperimentRunConfig:
@@ -313,6 +512,7 @@ class ExperimentRunConfig:
     label: str
     bssfp: BSSFPFamilyConfig | None = None
     fastse: FastSEFamilyConfig | None = None
+    vfa_fse: VFAFSEFamilyConfig | None = None
 
     def __post_init__(self) -> None:
         if not self.label:
@@ -324,11 +524,17 @@ class ExperimentRunConfig:
         if self.sequence_family == SequenceFamily.FASTSE and self.fastse is None:
             msg = "fastse configuration is required when sequence_family is FASTSE."
             raise ValueError(msg)
+        if self.sequence_family == SequenceFamily.VFA_FSE and self.vfa_fse is None:
+            msg = "vfa_fse configuration is required when sequence_family is VFA_FSE."
+            raise ValueError(msg)
         if self.sequence_family != SequenceFamily.BSSFP and self.bssfp is not None:
             msg = "bssfp settings may only be supplied for the BSSFP family."
             raise ValueError(msg)
         if self.sequence_family != SequenceFamily.FASTSE and self.fastse is not None:
             msg = "fastse settings may only be supplied for the FASTSE family."
+            raise ValueError(msg)
+        if self.sequence_family != SequenceFamily.VFA_FSE and self.vfa_fse is not None:
+            msg = "vfa_fse settings may only be supplied for the VFA_FSE family."
             raise ValueError(msg)
 
     @classmethod
@@ -342,6 +548,7 @@ class ExperimentRunConfig:
         label = str(mapping.get("label", default_label))
         bssfp_mapping = _optional_mapping(mapping.get("bssfp")) if "bssfp" in mapping else {}
         fastse_mapping = _optional_mapping(mapping.get("fastse")) if "fastse" in mapping else {}
+        vfa_fse_mapping = _optional_mapping(mapping.get("vfa_fse")) if "vfa_fse" in mapping else {}
         return cls(
             sequence_family=family,
             label=label,
@@ -355,6 +562,11 @@ class ExperimentRunConfig:
                 if family == SequenceFamily.FASTSE
                 else None
             ),
+            vfa_fse=(
+                VFAFSEFamilyConfig.from_mapping(vfa_fse_mapping, default_case_name=label)
+                if family == SequenceFamily.VFA_FSE
+                else None
+            ),
         )
 
     def to_run_config(self, physics: CommonPhysicsConfig) -> RunConfig:
@@ -364,12 +576,32 @@ class ExperimentRunConfig:
             raise ValueError(msg)
         return self.bssfp.to_run_config(physics)
 
+    def to_mapping(self) -> dict[str, Any]:
+        """Return a YAML-compatible run branch mapping."""
+        values: dict[str, Any] = {
+            "sequence_family": self.sequence_family.value,
+            "label": self.label,
+        }
+        if self.sequence_family == SequenceFamily.BSSFP and self.bssfp is not None:
+            values["bssfp"] = self.bssfp.to_mapping()
+        elif self.sequence_family == SequenceFamily.FASTSE and self.fastse is not None:
+            values["fastse"] = self.fastse.to_mapping()
+        elif self.sequence_family == SequenceFamily.VFA_FSE and self.vfa_fse is not None:
+            values["vfa_fse"] = self.vfa_fse.to_mapping()
+        return values
+
 
 @dataclass(slots=True)
 class ExperimentOutputConfig:
     """Optional output-side settings for comparison experiments."""
 
     summary_json: str | None = None
+
+    def to_mapping(self) -> dict[str, str]:
+        """Return a YAML-compatible output mapping."""
+        if self.summary_json is None:
+            return {}
+        return {"summary_json": self.summary_json}
 
 
 @dataclass(slots=True)
@@ -515,6 +747,7 @@ class ExperimentConfig:
             )
             raise ValueError(msg)
         self._validate_fastse_constraints()
+        self._validate_vfa_fse_constraints()
 
     def _validate_fastse_constraints(self) -> None:
         runs = (self.run_a, self.run_b)
@@ -531,6 +764,24 @@ class ExperimentConfig:
                 "FASTSE baseline does not support comparison_modes: "
                 + ", ".join(invalid_modes)
                 + f". Expected subset of {sorted(SUPPORTED_FASTSE_COMPARISON_MODES)}."
+            )
+            raise ValueError(msg)
+
+    def _validate_vfa_fse_constraints(self) -> None:
+        runs = (self.run_a, self.run_b)
+        if not any(run.sequence_family == SequenceFamily.VFA_FSE for run in runs):
+            return
+        if self.comparison_scope != "physics_only":
+            msg = "VFA_FSE_MANUAL currently supports comparison_scope='physics_only' only."
+            raise ValueError(msg)
+        invalid_modes = [
+            mode for mode in self.comparison_modes if mode not in SUPPORTED_VFA_FSE_COMPARISON_MODES
+        ]
+        if invalid_modes:
+            msg = (
+                "VFA_FSE_MANUAL does not support comparison_modes: "
+                + ", ".join(invalid_modes)
+                + f". Expected subset of {sorted(SUPPORTED_VFA_FSE_COMPARISON_MODES)}."
             )
             raise ValueError(msg)
 
@@ -580,3 +831,25 @@ class ExperimentConfig:
                 + ", ".join(sorted(set(unsupported)))
             )
             raise ValueError(msg)
+
+    def to_mapping(self) -> dict[str, Any]:
+        """Return a YAML-compatible experiment mapping."""
+        values: dict[str, Any] = {
+            "comparison_scope": self.comparison_scope,
+            "comparison_modes": list(self.comparison_modes),
+            "common_physics": self.common_physics.to_mapping(),
+            "run_a": self.run_a.to_mapping(),
+            "run_b": self.run_b.to_mapping(),
+        }
+        output_values = self.output.to_mapping()
+        if output_values:
+            values["output"] = output_values
+        return values
+
+    def to_yaml(self, path: Path) -> None:
+        """Write this experiment config as YAML."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            yaml.safe_dump(self.to_mapping(), sort_keys=False),
+            encoding="utf-8",
+        )

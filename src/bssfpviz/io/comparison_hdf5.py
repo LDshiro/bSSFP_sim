@@ -20,6 +20,18 @@ class ComparisonHDF5Error(ValueError):
     """Raised when a generic comparison HDF5 file is invalid."""
 
 
+def read_comparison_bundle_file_info(path: str | Path) -> dict[str, str]:
+    """Return top-level schema/app attributes for one comparison bundle file."""
+    input_path = Path(path)
+    with h5py.File(input_path, "r") as handle:
+        return {
+            "schema_kind": str(handle.attrs.get("schema_kind", "")),
+            "comparison_schema_version": str(handle.attrs.get("comparison_schema_version", "")),
+            "app_name": str(handle.attrs.get("app_name", "")),
+            "app_version": str(handle.attrs.get("app_version", "")),
+        }
+
+
 def save_comparison_bundle(path: str | Path, bundle: ComparisonBundle) -> None:
     """Write a ComparisonBundle to an HDF5 file."""
     output_path = Path(path)

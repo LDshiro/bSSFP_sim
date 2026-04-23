@@ -10,6 +10,7 @@ from bssfpviz.models.comparison import (
     FastSEFamilyConfig,
     SequenceFamily,
     SimulationResult,
+    VFAFSEFamilyConfig,
 )
 from bssfpviz.models.config import (
     SCHEMA_VERSION,
@@ -69,6 +70,7 @@ __all__ = [
     "SequenceFamily",
     "SimulationResult",
     "SweepConfig",
+    "VFAFSEFamilyConfig",
     "load_app_config",
     "load_project_config",
     "load_simulation_config",

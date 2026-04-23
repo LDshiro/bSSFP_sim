@@ -31,6 +31,10 @@ def test_preview_cli_generates_fastse_preview_json(tmp_path: Path) -> None:
     assert set(payload["runs"].keys()) == {"run_a", "run_b"}
     assert payload["runs"]["run_a"]["sequence_family"] == "FASTSE"
     assert payload["runs"]["run_a"]["family_preview"]["sample_count_echo"] == 4
+    assert payload["runs"]["run_a"]["timing_summary"]["te_contrast_definition"] == "TE_center-k"
+    assert payload["runs"]["run_b"]["timing_summary"]["te_contrast_definition"] == "WH2006"
+    assert payload["runs"]["run_b"]["timing_summary"]["ft_wh2006"] > 0.0
+    assert payload["runs"]["run_b"]["timing_summary"]["te_contrast_wh_ms"] > 0.0
 
 
 def test_preview_cli_generates_bssfp_preview_json(tmp_path: Path) -> None:
@@ -58,6 +62,43 @@ def test_preview_cli_generates_bssfp_preview_json(tmp_path: Path) -> None:
     assert run_a["family_preview"]["delta_f_hz"]["count"] == 3
 
 
+def test_preview_cli_generates_vfa_fse_preview_json(tmp_path: Path) -> None:
+    config_path = tmp_path / "preview_vfa_fse.yaml"
+    output_path = tmp_path / "preview_vfa_fse.json"
+    config_path.write_text(_vfa_fse_preview_config_text(), encoding="utf-8")
+
+    exit_code = main(
+        [
+            "--config",
+            str(config_path),
+            "--run",
+            "run_a",
+            "--output",
+            str(output_path),
+        ]
+    )
+
+    assert exit_code == 0
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert set(payload["runs"].keys()) == {"run_a"}
+    run_a = payload["runs"]["run_a"]
+    assert run_a["sequence_family"] == "VFA_FSE"
+    assert run_a["family_preview"]["sample_count_echo"] == 4
+    assert run_a["family_preview"]["phase_train_deg"] == [0.0, 90.0, 90.0, 90.0, 90.0]
+    assert run_a["timing_summary"]["te_contrast_definition"] == "Busse"
+    assert run_a["timing_summary"]["te_equiv_busse_ms"] >= 0.0
+    assert run_a["timing_summary"]["ft_wh2006"] >= 0.0
+    assert run_a["timing_summary"]["te_contrast_wh_ms"] >= 0.0
+    assert run_a["timing_summary"]["te_contrast_ms"] >= 0.0
+    assert len(run_a["family_preview"]["te_equiv_busse_ms_per_echo"]) == 4
+    assert len(run_a["family_preview"]["ft_wh2006_per_echo"]) == 4
+    assert len(run_a["family_preview"]["te_contrast_wh_ms_per_echo"]) == 4
+    assert (
+        run_a["warnings"][1]
+        == "Busse contrast-equivalent TE is derived from an internal no-relaxation rerun."
+    )
+
+
 def _fastse_preview_config_text() -> str:
     return dedent(
         """
@@ -66,8 +107,8 @@ def _fastse_preview_config_text() -> str:
           - matched_resolution
 
         common_physics:
-          T1_s: 1000000000.0
-          T2_s: 1000000000.0
+          T1_s: 1.2
+          T2_s: 0.08
           M0: 1.0
 
         run_a:
@@ -164,5 +205,65 @@ def _bssfp_preview_config_text() -> str:
                 start: -20.0
                 stop: 20.0
                 count: 3
+        """
+    ).strip()
+
+
+def _vfa_fse_preview_config_text() -> str:
+    return dedent(
+        """
+        comparison_scope: physics_only
+        comparison_modes:
+          - matched_resolution
+
+        common_physics:
+          T1_s: 1.2
+          T2_s: 0.08
+          M0: 1.0
+
+        run_a:
+          sequence_family: VFA_FSE
+          label: vfa_a
+          vfa_fse:
+            case_name: vfa_a
+            alpha_exc_deg: 90.0
+            phi_exc_deg: 0.0
+            alpha_ref_train_deg:
+              - 180.0
+              - 150.0
+              - 120.0
+              - 90.0
+            esp_ms: 8.0
+            te_nominal_ms: 16.0
+            n_iso: 101
+            off_resonance_hz: 0.0
+            timing_mode: user_fixed_ESP
+            initial_state_mode: equilibrium
+            dephasing_model: effective_1d
+
+        run_b:
+          sequence_family: VFA_FSE
+          label: vfa_b
+          vfa_fse:
+            case_name: vfa_b
+            alpha_exc_deg: 90.0
+            phi_exc_deg: 0.0
+            alpha_ref_train_deg:
+              - 150.0
+              - 130.0
+              - 110.0
+              - 90.0
+            phi_ref_train_deg:
+              - 90.0
+              - 100.0
+              - 110.0
+              - 120.0
+            esp_ms: 8.0
+            te_nominal_ms: 16.0
+            n_iso: 101
+            off_resonance_hz: 0.0
+            timing_mode: user_fixed_ESP
+            initial_state_mode: equilibrium
+            dephasing_model: effective_1d
         """
     ).strip()

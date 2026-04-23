@@ -19,6 +19,7 @@ from bssfpviz.models.comparison import (
 )
 from bssfpviz.sequences.bssfp.runner import run_bssfp_simulation
 from bssfpviz.sequences.fastse.runner import run_fastse_simulation
+from bssfpviz.sequences.vfa_fse.runner import run_vfa_fse_simulation
 
 
 @dataclass(slots=True)
@@ -34,6 +35,7 @@ class ComparisonSummary:
     elapsed_seconds: float
     matched_constraints_summary: dict[str, ScalarValue]
     derived_ratios: dict[str, float]
+    report_metadata: dict[str, str]
 
     def to_dict(self) -> dict[str, object]:
         """Return a JSON-serializable representation."""
@@ -44,7 +46,9 @@ class ComparisonSummary:
 
 def run_comparison(config: ExperimentConfig, output_path: Path) -> ComparisonSummary:
     """Execute a comparison experiment and write a generic HDF5 bundle."""
-    config.validate_supported_families({SequenceFamily.BSSFP, SequenceFamily.FASTSE})
+    config.validate_supported_families(
+        {SequenceFamily.BSSFP, SequenceFamily.FASTSE, SequenceFamily.VFA_FSE}
+    )
     start_time = perf_counter()
     run_a = _run_experiment_branch(
         config.run_a,
@@ -69,6 +73,7 @@ def run_comparison(config: ExperimentConfig, output_path: Path) -> ComparisonSum
         elapsed_seconds=elapsed_seconds,
         matched_constraints_summary=dict(bundle.matched_constraints_summary),
         derived_ratios=dict(bundle.derived_ratios),
+        report_metadata=dict(bundle.report_metadata),
     )
 
 
@@ -94,6 +99,15 @@ def _run_experiment_branch(
             config.common_physics,
             run_label=run_config.label,
         )
+    if run_config.sequence_family == SequenceFamily.VFA_FSE:
+        if run_config.vfa_fse is None:
+            msg = "Missing vfa_fse configuration for VFA_FSE run."
+            raise ValueError(msg)
+        return run_vfa_fse_simulation(
+            run_config.vfa_fse,
+            config.common_physics,
+            run_label=run_config.label,
+        )
     msg = f"Unsupported sequence family for compare workflow: {run_config.sequence_family.value}"
     raise ValueError(msg)
 
@@ -103,16 +117,35 @@ def _build_comparison_bundle(
     run_a: SimulationResult,
     run_b: SimulationResult,
 ) -> ComparisonBundle:
-    if run_a.sequence_family != run_b.sequence_family:
-        msg = "Mixed-family compare is not supported in this phase."
-        raise ValueError(msg)
+    report_metadata = {
+        "status": "comparison_ready",
+        "run_a_family": run_a.sequence_family.value,
+        "run_b_family": run_b.sequence_family.value,
+        "run_a_te_contrast_definition": str(
+            run_a.family_metadata.get("te_contrast_definition", "N/A")
+        ),
+        "run_b_te_contrast_definition": str(
+            run_b.family_metadata.get("te_contrast_definition", "N/A")
+        ),
+    }
 
-    if run_a.sequence_family == SequenceFamily.BSSFP:
+    if run_a.sequence_family == run_b.sequence_family == SequenceFamily.BSSFP:
         matched_constraints_summary, derived_ratios = _build_bssfp_metrics(run_a, run_b)
-    elif run_a.sequence_family == SequenceFamily.FASTSE:
-        matched_constraints_summary, derived_ratios = _build_fastse_metrics(run_a, run_b)
+        report_metadata["comparison_family_mode"] = "same_family"
+        report_metadata["supported_families"] = "BSSFP"
+    elif _is_supported_fse_like_pair(run_a.sequence_family, run_b.sequence_family):
+        matched_constraints_summary, derived_ratios = _build_fse_like_metrics(run_a, run_b)
+        report_metadata["comparison_family_mode"] = (
+            "same_family" if run_a.sequence_family == run_b.sequence_family else "mixed_family"
+        )
+        report_metadata["supported_families"] = (
+            f"{run_a.sequence_family.value},{run_b.sequence_family.value}"
+        )
     else:
-        msg = f"Unsupported comparison family: {run_a.sequence_family.value}"
+        msg = (
+            "Mixed-family compare is supported in this phase only for "
+            "FASTSE <-> VFA_FSE physics-only comparisons."
+        )
         raise ValueError(msg)
 
     return ComparisonBundle(
@@ -122,11 +155,7 @@ def _build_comparison_bundle(
         run_b=run_b,
         matched_constraints_summary=matched_constraints_summary,
         derived_ratios=derived_ratios,
-        report_metadata={
-            "status": "comparison_ready",
-            "supported_families": run_a.sequence_family.value,
-            "same_family_only": "true",
-        },
+        report_metadata=report_metadata,
     )
 
 
@@ -156,7 +185,7 @@ def _build_bssfp_metrics(
     )
 
 
-def _build_fastse_metrics(
+def _build_fse_like_metrics(
     run_a: SimulationResult,
     run_b: SimulationResult,
 ) -> tuple[dict[str, ScalarValue], dict[str, float]]:
@@ -166,9 +195,29 @@ def _build_fastse_metrics(
     fid_peak_b = float(run_b.scalars.get("fid_peak_abs", 0.0))
     etl_a = int(run_a.scalars.get("etl", 0))
     etl_b = int(run_b.scalars.get("etl", 0))
+    te_center_a = float(run_a.scalars.get("te_center_k_ms", 0.0))
+    te_center_b = float(run_b.scalars.get("te_center_k_ms", 0.0))
+    te_contrast_a = _coerce_te_contrast_scalar(run_a)
+    te_contrast_b = _coerce_te_contrast_scalar(run_b)
+    esp_a = float(run_a.scalars.get("esp_ms", 0.0))
+    esp_b = float(run_b.scalars.get("esp_ms", 0.0))
+    te_contrast_epsilon_ms = max(5.0, esp_a, esp_b)
+    delta_te_contrast_ms = (
+        te_contrast_b - te_contrast_a
+        if np.isfinite(te_contrast_a) and np.isfinite(te_contrast_b)
+        else float("nan")
+    )
     return (
         {
             "delta_etl": etl_b - etl_a,
+            "delta_te_center_k_ms": te_center_b - te_center_a,
+            "delta_te_contrast_ms": delta_te_contrast_ms,
+            "te_contrast_epsilon_ms": te_contrast_epsilon_ms,
+            "te_contrast_is_matched": (
+                bool(abs(delta_te_contrast_ms) <= te_contrast_epsilon_ms)
+                if np.isfinite(delta_te_contrast_ms)
+                else False
+            ),
             "delta_echo_peak_abs": echo_peak_b - echo_peak_a,
             "delta_fid_peak_abs": fid_peak_b - fid_peak_a,
         },
@@ -177,6 +226,23 @@ def _build_fastse_metrics(
             "fid_peak_ratio_b_over_a": _safe_ratio(fid_peak_b, fid_peak_a),
         },
     )
+
+
+def _is_supported_fse_like_pair(
+    family_a: SequenceFamily,
+    family_b: SequenceFamily,
+) -> bool:
+    fse_like = {SequenceFamily.FASTSE, SequenceFamily.VFA_FSE}
+    if family_a == family_b and family_a in fse_like:
+        return True
+    return {family_a, family_b} == fse_like
+
+
+def _coerce_te_contrast_scalar(result: SimulationResult) -> float:
+    value = result.scalars.get("te_contrast_ms")
+    if value is None:
+        value = result.scalars.get("te_equiv_busse_ms", result.scalars.get("te_center_k_ms", 0.0))
+    return float(value)
 
 
 def _max_observable(result: SimulationResult, key: str) -> float:

@@ -23,8 +23,13 @@ The current repository now contains two layers:
 ## Comparison Backend Status
 - `SequenceFamily`, `ExperimentConfig`, `SimulationResult`, and `ComparisonBundle` have been added
 - bSSFP is now available as a first-class family inside the generic comparison backend
-- `bssfpviz-compare` runs `BSSFP` vs `BSSFP` experiments and writes generic comparison HDF5 bundles
-- Fast SE and VFA-FSE are not implemented yet; the backend is prepared for those families next
+- `FASTSE_CONST` is available for idealized same-family comparison runs
+- `FASTSE_CONST` derives WH2006 `f_t` / `TE_contrast_WH` and uses flip-aware `te_contrast_ms`
+- `VFA_FSE_MANUAL` is available for idealized same-family and FASTSE cross-family comparison runs
+- `VFA_FSE_MANUAL` derives Busse contrast-equivalent TE and WH2006 `f_t` / `TE_contrast_WH`
+- `bssfpviz-compare` writes generic comparison HDF5 bundles for `BSSFP`, `FASTSE`, and `VFA_FSE`
+- `FASTSE` vs `VFA_FSE` mixed-family compare is supported for physics-only `matched_TE_contrast`
+- scan-time / SAR proxy models and `VFA_FSE_B2006` / `VFA_FSE_B2008` are not implemented yet
 
 ## Tech Stack
 - Python 3.11+
@@ -126,10 +131,44 @@ bssfpviz-compare --config examples/configs/comparison_bssfp_minimal.yaml --outpu
 This workflow currently supports:
 - `comparison_scope = physics_only`
 - `BSSFP` vs `BSSFP`
+- `FASTSE` vs `FASTSE`
+- `VFA_FSE` vs `VFA_FSE`
+- `FASTSE` vs `VFA_FSE` for physics-only contrast matching
 - generic comparison HDF5 output under `/runs/a`, `/runs/b`, and `/comparison`
+- `matched_TE_contrast` report-first summaries for FASTSE/VFA family pairs using each run's default
+  `te_contrast_ms`
 
-The current GUI does not open these generic comparison bundles. It remains a legacy bSSFP viewer
-for the Chapter 7 dataset layout.
+Example configs:
+- [comparison_bssfp_minimal.yaml](/c:/Users/shiro/OneDrive/ドキュメント/Spyder/MISOCP/bSSFP/examples/configs/comparison_bssfp_minimal.yaml)
+- [comparison_fastse_minimal.yaml](/c:/Users/shiro/OneDrive/ドキュメント/Spyder/MISOCP/bSSFP/examples/configs/comparison_fastse_minimal.yaml)
+- [comparison_fastse_vfa_cross_family_minimal.yaml](/c:/Users/shiro/OneDrive/ドキュメント/Spyder/MISOCP/bSSFP/examples/configs/comparison_fastse_vfa_cross_family_minimal.yaml)
+- [comparison_vfa_fse_manual_minimal.yaml](/c:/Users/shiro/OneDrive/ドキュメント/Spyder/MISOCP/bSSFP/examples/configs/comparison_vfa_fse_manual_minimal.yaml)
+
+The Chapter 7 main window still remains a legacy bSSFP viewer for the Chapter 7 dataset layout.
+In addition, `Open Generic Preview...` now opens an inspector shell that can:
+- edit `ExperimentConfig` inputs with a structured family-aware form
+- preview `Sequence` and `Timing / Contrast` from the current editor state
+- run the same generic comparison backend used by `bssfpviz-compare`
+- auto-load the generated comparison bundle
+- inspect bundle-driven `Scene`, `Results`, `Comparison`, `Metadata`, and `Log`
+- load existing generic comparison bundles for later inspection
+
+The generic shell is still separate from the legacy Chapter 7 bSSFP viewer. It supports the current
+backend families (`BSSFP`, `FASTSE_CONST`, and `VFA_FSE_MANUAL`) and keeps `VFA_FSE_B2006`,
+`VFA_FSE_B2008`, `protocol_realistic`, scan-time, SAR, and coverage controls as future work.
+
+## Preview CLI
+```bash
+bssfpviz-preview --config examples/configs/comparison_vfa_fse_manual_minimal.yaml --run run_a --output data/generated/preview_vfa.json
+```
+
+This workflow currently exposes:
+- static sequence/timing previews for `BSSFP`
+- executed preview metrics for `FASTSE`, including flip-aware `te_contrast_ms`,
+  `ft_wh2006`, and `te_contrast_wh_ms`
+- executed preview metrics for `VFA_FSE_MANUAL`, including `te_equiv_busse_ms`,
+  `ft_wh2006`, and `te_contrast_wh_ms`
+- preview JSON used by the generic inspector shell for `Sequence` and `Timing / Contrast`
 
 ## Core Solver
 The compute CLI and the GUI-triggered background runner share a solver pipeline built around a

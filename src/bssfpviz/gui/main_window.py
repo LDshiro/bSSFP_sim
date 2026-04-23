@@ -33,6 +33,7 @@ from bssfpviz.gui.compute_worker import ComputeWorker
 from bssfpviz.gui.config_editor import ConfigEditor
 from bssfpviz.gui.dataset_view_model import DatasetViewModel
 from bssfpviz.gui.export_service import ExportService
+from bssfpviz.gui.generic_preview_window import GenericPreviewWindow
 from bssfpviz.gui.log_panel import LogPanel
 from bssfpviz.gui.metadata_panel import MetadataPanel
 from bssfpviz.gui.playback_bar import PlaybackBar
@@ -66,6 +67,7 @@ class MainWindow(QMainWindow):
         self._compare_view_model: DatasetViewModel | None = None
         self._compute_thread: QThread | None = None
         self._compute_worker: ComputeWorker | None = None
+        self._generic_preview_window: GenericPreviewWindow | None = None
         self._is_running = False
 
         self.comparison_controller = ComparisonController(self)
@@ -271,6 +273,15 @@ class MainWindow(QMainWindow):
         self._set_status_message("Export bundle created")
         self.log_panel.append_log(f"exported bundle: {output_dir}")
 
+    def on_open_generic_preview(self) -> None:
+        """Open the preview-only generic inspector shell."""
+        if self._generic_preview_window is None:
+            self._generic_preview_window = GenericPreviewWindow(self)
+            self._generic_preview_window.destroyed.connect(self._clear_generic_preview_window)
+        self._generic_preview_window.show()
+        self._generic_preview_window.raise_()
+        self._generic_preview_window.activateWindow()
+
     def on_run_compute(self) -> None:
         """Start a background compute run from the current config."""
         if self._is_running:
@@ -417,6 +428,7 @@ class MainWindow(QMainWindow):
         self.open_hdf5_action = QAction("Open Primary Dataset...", self)
         self.open_primary_dataset_action = self.open_hdf5_action
         self.open_compare_dataset_action = QAction("Open Compare Dataset...", self)
+        self.open_generic_preview_action = QAction("Open Generic Preview...", self)
         self.save_session_action = QAction("Save Session Preset...", self)
         self.load_session_action = QAction("Load Session Preset...", self)
         self.export_bundle_action = QAction("Export Current View Bundle...", self)
@@ -434,6 +446,7 @@ class MainWindow(QMainWindow):
         self.save_config_action.setObjectName("action-save-config")
         self.open_hdf5_action.setObjectName("action-open-hdf5")
         self.open_compare_dataset_action.setObjectName("action-open-compare-dataset")
+        self.open_generic_preview_action.setObjectName("action-open-generic-preview")
         self.save_session_action.setObjectName("action-save-session")
         self.load_session_action.setObjectName("action-load-session")
         self.export_bundle_action.setObjectName("action-export-bundle")
@@ -450,6 +463,7 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
         file_menu.addAction(self.open_primary_dataset_action)
         file_menu.addAction(self.open_compare_dataset_action)
+        file_menu.addAction(self.open_generic_preview_action)
         file_menu.addSeparator()
         file_menu.addAction(self.save_session_action)
         file_menu.addAction(self.load_session_action)
@@ -479,6 +493,7 @@ class MainWindow(QMainWindow):
         toolbar.addAction(self.save_config_action)
         toolbar.addAction(self.open_primary_dataset_action)
         toolbar.addAction(self.open_compare_dataset_action)
+        toolbar.addAction(self.open_generic_preview_action)
         toolbar.addSeparator()
         toolbar.addAction(self.save_session_action)
         toolbar.addAction(self.load_session_action)
@@ -499,6 +514,7 @@ class MainWindow(QMainWindow):
         self.save_config_action.triggered.connect(self.on_save_config_as)
         self.open_primary_dataset_action.triggered.connect(self.on_open_primary_dataset)
         self.open_compare_dataset_action.triggered.connect(self.on_open_compare_dataset)
+        self.open_generic_preview_action.triggered.connect(self.on_open_generic_preview)
         self.save_session_action.triggered.connect(self.on_save_session_preset)
         self.load_session_action.triggered.connect(self.on_load_session_preset)
         self.export_bundle_action.triggered.connect(self.on_export_current_view_bundle)
@@ -594,6 +610,9 @@ class MainWindow(QMainWindow):
     def _clear_compute_thread(self) -> None:
         self._compute_thread = None
         self._compute_worker = None
+
+    def _clear_generic_preview_window(self) -> None:
+        self._generic_preview_window = None
 
     def _set_running_state(self, running: bool, *, message: str) -> None:
         self._is_running = running

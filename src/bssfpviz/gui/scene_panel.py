@@ -54,8 +54,8 @@ class ScenePanel(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._vm: DatasetViewModel | None = None
-        self._controller: PlaybackController | ComparisonController | None = None
+        self._vm: Any | None = None
+        self._controller: Any | None = None
         self._mode = "fallback"
         self._plotter: Any | None = None
         self._pyvista: Any | None = None
@@ -101,6 +101,19 @@ class ScenePanel(QWidget):
             self.render_from_comparison_controller(controller)
         else:
             self.refresh_scene()
+
+    def set_generic_controller(self, controller: Any | None) -> None:
+        """Attach a generic playback controller while reusing the optimized renderer."""
+        if self._controller is controller:
+            self._vm = None if controller is None else controller.view_model()
+            self.refresh_scene()
+            return
+
+        self._disconnect_controller_signals()
+        self._controller = controller
+        self._vm = None if controller is None else controller.view_model()
+        self._connect_controller_signals(controller)
+        self.refresh_scene()
 
     def refresh_scene(self) -> None:
         """Refresh the scene from the currently attached single dataset."""
@@ -724,6 +737,8 @@ class ScenePanel(QWidget):
         if isinstance(self._controller, ComparisonController):
             self.render_from_comparison_controller(self._controller)
             return
+        if self._controller is not None and not isinstance(self._controller, PlaybackController):
+            self._vm = self._controller.view_model()
         self.refresh_scene()
 
 
